@@ -1,0 +1,17 @@
+name: ratelimit-lab
+
+services:
+  redis:
+    image: redis:8-alpine
+    container_name: ratelimit-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    # Persistence is off on purpose: limiter state is ephemeral, and a clean
+    # slate on every restart keeps test runs reproducible.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 2s
