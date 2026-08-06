@@ -2,7 +2,10 @@ module github.com/pnaskardev/ratelimit-lab
 
 go 1.26.3
 
-require github.com/gofiber/fiber/v3 v3.4.0
+require (
+	github.com/gofiber/fiber/v3 v3.4.0
+	github.com/redis/go-redis/v9 v9.22.0
+)
 
 require (
 	github.com/andybalholm/brotli v1.2.2 // indirect
@@ -14,7 +17,6 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.72.0 // indirect

@@ -31,3 +31,15 @@ func InitCache() error {
 
 	return nil
 }
+
+func GetCacheClient() *redis.Client {
+
+	if redisClient == nil {
+		err := InitCache()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return redisClient
+}
