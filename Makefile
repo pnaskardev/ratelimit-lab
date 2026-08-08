@@ -12,8 +12,8 @@ export APP_PORT
 
 ## up: start redis if needed, then run the app with live reload
 up: redis-up
-	@if command -v air >/dev/null 2>&1; then air; else \
-	  echo "air not found, falling back to 'go run .'"; go run .; fi
+	@if air -v >/dev/null 2>&1; then air; else \
+	  echo "air not usable, falling back to 'go run .'"; go run .; fi
 
 ## run: start redis if needed, then run the app without live reload
 run: redis-up
@@ -34,8 +34,12 @@ help:
 # ---- tests ----
 
 ## test: run all tests
-test:
+test: redis-up
 	go test $(PKG)
+
+## test-short: run all tests, skipping the ones that wait out a window boundary
+test-short: redis-up
+	go test -short $(PKG)
 
 ## race: run all tests under the race detector
 race: redis-up
@@ -89,5 +93,5 @@ redis-flush: redis-up
 clean: down
 	rm -rf tmp/ build-errors.log
 
-.PHONY: up run build down help test race bench check fmt vet tidy \
+.PHONY: up run build down help test test-short race bench check fmt vet tidy \
         redis-up redis-cli redis-logs redis-flush clean
