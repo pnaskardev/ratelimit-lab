@@ -19,6 +19,7 @@ type middlewares struct {
 
 type Middlewares interface {
 	FixedWindowMiddleware() fiber.Handler
+	TokenBucketMiddleware() fiber.Handler
 }
 
 func NewMiddlewares(cache *redis.Client) Middlewares {
@@ -69,6 +70,13 @@ func (m *middlewares) FixedWindowMiddleware() fiber.Handler {
 		if count > limit {
 			return c.SendStatus(fiber.StatusTooManyRequests)
 		}
+
+		return c.Next()
+	}
+}
+
+func (m *middlewares) TokenBucketMiddleware() fiber.Handler {
+	return func(c fiber.Ctx) error {
 
 		return c.Next()
 	}

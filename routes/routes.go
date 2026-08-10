@@ -15,4 +15,5 @@ func RegisterRoutes(app fiber.Router, cacheClient *redis.Client) {
 	apiGroup := app.Group("/api")
 
 	apiGroup.Post("/fixed-window", rateLimitingMiddleware.FixedWindowMiddleware(), newHandlers.DefaultHandler)
+	apiGroup.Get("/token-bucket", rateLimitingMiddleware.TokenBucketMiddleware(), newHandlers.DefaultHandler)
 }
