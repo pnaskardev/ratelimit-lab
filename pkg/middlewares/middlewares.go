@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/pnaskardev/ratelimit-lab/pkg/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -28,12 +29,6 @@ func NewMiddlewares(cache *redis.Client) Middlewares {
 	}
 }
 
-// fixedWindowKey is the redis key holding the request count for one client
-// within one window.
-func fixedWindowKey(ip string, windowStart time.Time) string {
-	return fmt.Sprintf("ratelimit:fixed:%s:%d", ip, windowStart.Unix())
-}
-
 func (m *middlewares) FixedWindowMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 
@@ -45,7 +40,7 @@ func (m *middlewares) FixedWindowMiddleware() fiber.Handler {
 		// When is the first request made
 		var windowStart time.Time = time.Now().UTC().Truncate(window)
 
-		var key string = fixedWindowKey(ip, windowStart)
+		var key string = utils.FixedWindowKey(ip, windowStart)
 
 		log.Printf("rate limit key: %s", key)
 

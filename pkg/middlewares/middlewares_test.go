@@ -15,6 +15,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/pnaskardev/ratelimit-lab/pkg/handlers"
+	"github.com/pnaskardev/ratelimit-lab/pkg/utils"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -198,7 +199,7 @@ func TestFixedWindowTTLExpiresAtWindowBoundary(t *testing.T) {
 
 	postStatus(t, app, ip)
 
-	key := fixedWindowKey(ip, windowStart())
+	key := utils.FixedWindowKey(ip, windowStart())
 	firstTTL, err := client.TTL(ctx, key).Result()
 	if err != nil {
 		t.Fatalf("read ttl for %s: %v", key, err)
