@@ -29,6 +29,8 @@ func NewMiddlewares(cache *redis.Client) Middlewares {
 	}
 }
 
+// In a particular window of time you can make a fixed number of requests
+// Anything more than the particular number of requests are blocked
 func (m *middlewares) FixedWindowMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 
@@ -70,6 +72,8 @@ func (m *middlewares) FixedWindowMiddleware() fiber.Handler {
 	}
 }
 
+// You can make as many requests as much the tokens available in the bucket
+// The tokens regenerate per minute / hour
 func (m *middlewares) TokenBucketMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 
