@@ -13,8 +13,6 @@ import (
 const limit = 5
 const window time.Duration = time.Duration(time.Second * 30)
 
-
-
 // In a particular window of time you can make a fixed number of requests
 // Anything more than the particular number of requests are blocked
 func (m *middlewares) FixedWindowMiddleware() fiber.Handler {

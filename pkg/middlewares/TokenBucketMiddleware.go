@@ -6,10 +6,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type TokenBucketMiddleware interface {
-	TokenBucketMiddleware() fiber.Handler
-}
-
 func (m *middlewares) TokenBucketMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 
