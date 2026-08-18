@@ -2,72 +2,101 @@ package middlewares
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/log"
+	"github.com/pnaskardev/ratelimit-lab/pkg/utils"
 )
 
 const maxTokens = 2
-const refillInterval = 60
+const refillInterval time.Duration = time.Duration(time.Second * 60)
 const tokensPerRefill = 2
 
+// A bucket that has been idle long enough to refill completely is
+// indistinguishable from a brand new one, so it can be dropped rather than kept
+// around forever for an IP that may never come back.
+const bucketTTL time.Duration = (maxTokens/tokensPerRefill + 1) * refillInterval
+
+// Each client gets a bucket of tokens. A request spends one, and tokens drip
+// back in over time. Bursts are allowed up to the bucket size; the sustained
+// rate is capped by the refill rate.
 func (m *middlewares) TokenBucketMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*1))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+
 		// WHO, WO IS THE CLIENT?
 		var ip = c.IP()
 
-		key := fmt.Sprintf("rate_limit:%s", ip)
+		key := utils.TokenBucketKey(ip)
 
-		existsBool, err := m.cache.Exists(ctx, key).Result()
+		now := time.Now()
+
+		// An unknown client starts with a full bucket, so a missing key needs no
+		// separate seeding round trip.
+		tokens := maxTokens
+		lastRefill := now
+
+		values, err := m.cache.HMGet(ctx, key, "tokens", "last_refill_time").Result()
 		if err != nil {
-			log.Errorf("REDIS ERROR : %v", err)
+			log.Errorf("TOKEN BUCKET: FAILED TO READ %s: %v", key, err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		// the user cam for the first time and we need to set the key
-		if existsBool == 0 {
-			m.cache.HSet(ctx, key, "tokens", maxTokens)
-			m.cache.HSet(ctx, key, "last_refill_time", time.Now().Unix())
+		// Redis reports a missing key or a missing field as a nil element, so
+		// every element has to be checked before it is used.
+		if len(values) == 2 {
+			storedTokens, tokensOK := hashInt64(values[0])
+			storedRefill, refillOK := hashInt64(values[1])
+			if tokensOK && refillOK {
+				tokens = int(storedTokens)
+				lastRefill = time.Unix(storedRefill, 0)
+			}
 		}
-
-		// If already set dont do anything and move forward because tokens and time refill already exists
-		var setTokens = 0
-		var setRefillTimeUnix = time.Now()
-
-		// We already have the key now try to get the last refill time
-		values, err := m.cache.HMGet(ctx, key, "tokens", "last_refill_time").Result()
-		if err != nil || len(values) != 2 {
-			log.Errorf("FAILED TO GET TOKEN BUCKET; %v", err)
-			// return c.SendStatus(fiber.StatusInternalServerError)
-			setTokens = 0
-			setRefillTimeUnix = time.Now()
-		}
-		setTokens, _ = strconv.Atoi(values[0].(string))
-		lastRefill, _ := strconv.ParseInt(values[1].(string), 10, 64)
-
-		setRefillTimeUnix = time.Unix(lastRefill, 0)
 
 		// Refill TOKENS INTO THE BUCKET
-		now := time.Now()
-		elapsed := now.Sub(setRefillTimeUnix)
-
-		if elapsed >= time.Duration(refillInterval*time.Second) {
-			setTokens = min(setTokens+tokensPerRefill, maxTokens)
-			m.cache.HSet(ctx, fmt.Sprintf("rate_limit:%s", ip), "tokens", setTokens)
-			m.cache.HSet(ctx, fmt.Sprintf("rate_limit:%s", ip), "last_refill_time", now.Unix())
+		if intervals := int(now.Sub(lastRefill) / refillInterval); intervals > 0 {
+			tokens = min(tokens+intervals*tokensPerRefill, maxTokens)
+			// Advance by whole intervals only; carrying the remainder forward
+			// keeps the long-run refill rate exact.
+			lastRefill = lastRefill.Add(time.Duration(intervals) * refillInterval)
 		}
 
-		if setTokens > 0 {
-			m.cache.HIncrBy(ctx, fmt.Sprintf("rate_limit:%s", ip), "tokens", -1)
-			return c.Next()
+		if tokens <= 0 {
+			// Nothing changed, so the stored state is still accurate as is.
+			return c.SendStatus(fiber.StatusTooManyRequests)
 		}
 
-		return c.SendStatus(fiber.StatusTooManyRequests)
+		tokens--
+
+		if err := m.cache.HSet(ctx, key, "tokens", tokens, "last_refill_time", lastRefill.Unix()).Err(); err != nil {
+			log.Errorf("TOKEN BUCKET: FAILED TO WRITE %s: %v", key, err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		if err := m.cache.Expire(ctx, key, bucketTTL).Err(); err != nil {
+			log.Errorf("TOKEN BUCKET: FAILED TO SET TTL ON %s: %v", key, err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		return c.Next()
 	}
+}
+
+// hashInt64 reads one element of an HMGet reply, which is nil when the key or
+// the field is absent.
+func hashInt64(value any) (int64, bool) {
+	str, ok := value.(string)
+	if !ok {
+		return 0, false
+	}
+
+	parsed, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	return parsed, true
 }
