@@ -9,11 +9,11 @@ import (
 
 func RegisterRoutes(app fiber.Router, cacheClient *redis.Client) {
 
-	rateLimitingMiddleware := middlewares.NewMiddlewares(cacheClient)
+	middlewareInstance := middlewares.NewMiddlewares(cacheClient)
 	newHandlers := handlers.NewHandlers()
 
 	apiGroup := app.Group("/api")
 
-	apiGroup.Post("/fixed-window", rateLimitingMiddleware.FixedWindowMiddleware(), newHandlers.DefaultHandler)
-	apiGroup.Get("/token-bucket", rateLimitingMiddleware.TokenBucketMiddleware(), newHandlers.DefaultHandler)
+	apiGroup.Post("/fixed-window", middlewareInstance.FixedWindowMiddleware(), newHandlers.DefaultHandler)
+	apiGroup.Get("/token-bucket", middlewareInstance.TokenBucketMiddleware(), newHandlers.DefaultHandler)
 }
