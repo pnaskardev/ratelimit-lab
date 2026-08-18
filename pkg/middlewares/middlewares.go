@@ -12,6 +12,7 @@ type middlewares struct {
 type Middlewares interface {
 	FixedWindowMiddleware() fiber.Handler
 	TokenBucketMiddleware() fiber.Handler
+	SlidingWindowLogMiddleware() fiber.Handler
 }
 
 func NewMiddlewares(cache *redis.Client) Middlewares {
